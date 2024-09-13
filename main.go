@@ -101,7 +101,7 @@ func ceateTunnel(colony *Colony, line string) (*Colony, error) {
 	// connecting the links to the rooms
 	colony.Links[room1] = append(colony.Links[room1], room2)
 	//If line is commited we will be working on directional graph 
-	// colony.Links[room2] = append(colony.Links[room2], room1)
+	colony.Links[room2] = append(colony.Links[room2], room1)
 	return colony, nil
 }	
 
