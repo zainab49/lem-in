@@ -17,23 +17,25 @@ type Room struct {
 
 type Colony struct {
 	Rooms map[string]Room
-	start string 
-	end string
+	start string
+	end   string
+	numAnts int
 	Links map[string][]string
 }
 
-
 // Read the colony from the file (this function will be used to test if there a room in certain coordinates,
-//  if so the input will be considered invalid)
+//
+//	if so the input will be considered invalid)
 func checkCoordinates(colony *Colony) {
 	for room, links := range colony.Links {
 		fmt.Printf("%s: %v\n", room, links)
 	}
-	fmt.Println("Colory:\n",colony)
+	fmt.Println("Colory:\n", colony)
 }
-//read the file and return the lines
-func readFile (filename string)[]string {
-	file,err := os.Open(filename)
+
+// read the file and return the lines
+func readFile(filename string) []string {
+	file, err := os.Open(filename)
 	if err != nil {
 		log.Fatal("Error opening file: %v", err)
 	}
@@ -41,7 +43,7 @@ func readFile (filename string)[]string {
 	defer file.Close()
 	var lines []string
 	scanner := bufio.NewScanner(file)
-	for scanner.Scan(){
+	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
 		if line != "" {
 			lines = append(lines, line)
@@ -53,30 +55,31 @@ func readFile (filename string)[]string {
 	}
 	return lines
 }
-//create Rooms 
-func createRoom(colony *Colony,room string)(*Colony,error){
+
+// create Rooms
+func createRoom(colony *Colony, room string) (*Colony, error) {
 	// Room
 	parts := strings.Split(room, " ")
 	if len(parts) != 3 {
 		return nil, fmt.Errorf("invalid room format: %s", room)
 	}
 	name, xStr, yStr := parts[0], parts[1], parts[2]
-	
+
 	xCoord, err := strconv.Atoi(parts[1])
 	if err != nil {
 		return nil, fmt.Errorf("invalid x coordinate: %s", xStr)
 	}
 	yCoord, err := strconv.Atoi(parts[2])
 	if err != nil {
-		return nil,fmt.Errorf("invalid y coordinate: %s", yStr)
+		return nil, fmt.Errorf("invalid y coordinate: %s", yStr)
 	}
 	colony.Rooms[name] = Room{Name: name, X: xCoord, Y: yCoord}
-	return colony,nil
+	return colony, nil
 }
 
-// Create a tunnel 
+// Create a tunnel
 func ceateTunnel(colony *Colony, line string) (*Colony, error) {
-	// It's a link 
+	// It's a link
 	parts := strings.Split(line, "-")
 	if len(parts) != 2 {
 		return nil, fmt.Errorf("invalid tunnel format: %s", line)
@@ -100,10 +103,10 @@ func ceateTunnel(colony *Colony, line string) (*Colony, error) {
 	}
 	// connecting the links to the rooms
 	colony.Links[room1] = append(colony.Links[room1], room2)
-	//If line is commited we will be working on directional graph 
+	//If line is commited we will be working on directional graph
 	colony.Links[room2] = append(colony.Links[room2], room1)
 	return colony, nil
-}	
+}
 
 // readColony reads the colony from the given file
 func readColony(fileContent []string) (Colony, int, error) {
@@ -114,7 +117,7 @@ func readColony(fileContent []string) (Colony, int, error) {
 
 	var numAnts int
 	firstLine := true
-	
+
 	for index, line := range fileContent {
 		if firstLine {
 			var err error
@@ -143,7 +146,7 @@ func readColony(fileContent []string) (Colony, int, error) {
 			} else {
 				continue
 			}
-			
+
 		} else if strings.Contains(line, "-") {
 			_, err := ceateTunnel(&colony, line)
 			if err != nil {
@@ -151,7 +154,7 @@ func readColony(fileContent []string) (Colony, int, error) {
 			}
 		} else {
 			// Room
-			
+
 			createRoom(&colony, line)
 		}
 	}
@@ -159,12 +162,9 @@ func readColony(fileContent []string) (Colony, int, error) {
 	return colony, numAnts, nil
 }
 
-
-
-
 // Function to find all paths from start to end
 func findAllPaths(colony Colony, start, end string) [][]string {
-	fmt.Println("start: ",start," end: ",end)
+	fmt.Println("start: ", start, " end: ", end)
 	var allPaths [][]string
 	visited := make(map[string]bool)
 	var path []string
@@ -289,8 +289,13 @@ func main() {
 			fmt.Println(strings.Join(path, " -> "))
 		}
 
-		// Remove paths with the most collisions make sure this function is called only if we have more than one path 
+		// Remove paths with the most collisions make sure this function is called only if we have more than one path
 		paths = removeMostCollidingPaths(paths)
+		fmt.Println("Weights:", calculateWeight(&paths))
+		weight := calculateWeight(&paths)
+		colony.numAnts = numAnts
+		fmt.Println("candidate paths at index",candidatePaths(&paths, &weight,numAnts))
+		fmt.Println("Fix the collision function",paths)
 		fmt.Println("Filtered paths with least collisions:")
 		for _, path := range paths {
 			fmt.Println(strings.Join(path, " -> "))
@@ -298,7 +303,75 @@ func main() {
 	} else {
 		fmt.Println("Start or end room not defined.")
 	}
+
 }
 
+func calculateWeight(paths *[][]string) []int {
+	weights := make([]int, len(*paths))
+	for i, path := range *paths {
+		weights[i] = len(path)
+	}
+	return weights
+}
 
+func smallestPath(paths *[][]string, weight *[]int, index int) (int, []string) {
+	if len(*paths) == 0 || len(*paths) < index {
+		log.Fatal("No paths found")
+	}
+	candidatePath := (*paths)[index]
+	
+	indexSmallest := index
+	for i := index; i < len(*paths); i++ {
+		for j := i + 1; j < len(*weight); j++ {
+			if len(candidatePath) > (*weight)[j] {
+				candidatePath = (*paths)[j]
+				indexSmallest = j
+			}
+		}
+
+	}
+	return indexSmallest, candidatePath
+}
+func candidatePaths(paths *[][]string, weight *[]int, numAnts int) [][]string {
+	if len(*paths) == 0 {
+		log.Fatal("No paths found")
+	}
+	var candidatePaths [][]string
+	var i int
+	for i = 0; i < len(*paths); i++ {
+		if i == 0 {
+			_, P := smallestPath(paths, weight, 0)
+			candidatePaths = append(candidatePaths, P)
+		} else {
+			j, p := smallestPath(paths, weight, i)
+			
+			if len(*&candidatePaths) >=numAnts{
+				return candidatePaths
+			}
+			if vertexCollision(&candidatePaths, (*paths)[j]) {
+				fmt.Println("i: ", i, "path: ", p)
+				candidatePaths = append(candidatePaths, p)
+			} else {
+				// Remove the path at index j from *paths
+				*paths = append((*paths)[:j], (*paths)[j+1:]...)
+				*weight = append((*weight)[:j], (*weight)[j+1:]...)
+				// Since the slice has been modified, we need to adjust the loop variable
+				i-- // Decrement i to recheck the index of the next path
+			}
+		}
+	}
+	return candidatePaths
+}
+
+func vertexCollision(candidatePaths *[][]string, path []string) bool {
+	for _, candidatePath := range *candidatePaths {
+		for i, _ := range candidatePath {
+			if i>0&&i < len(path) && candidatePath[i] == path[i] {
+				fmt.Println(path,"\nhhh\n",*candidatePaths)
+				return false
+			}
+		}
+	}
+	return true
+}
 
