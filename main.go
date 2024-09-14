@@ -253,7 +253,6 @@ func removeMostCollidingPaths(paths [][]string) [][]string {
 
 	return filteredPaths
 }
-
 func main() {
 	if len(os.Args) < 2 {
 		fmt.Println("Usage: go run . <filename>")
@@ -266,41 +265,77 @@ func main() {
 		return
 	}
 
-	// Print the number of ants
 	fmt.Println(numAnts)
 
-	// Print the rooms
 	fmt.Println("Rooms:")
 	for name, room := range colony.Rooms {
 		fmt.Printf("%s: (%d, %d)\n", name, room.X, room.Y)
 	}
 
-	// Print the links
 	fmt.Println("Links:")
 	for room, links := range colony.Links {
 		fmt.Printf("%s: %v\n", room, links)
 	}
 
-	// Find and print all paths
 	if colony.start != "" && colony.end != "" {
 		paths := findAllPaths(colony, colony.start, colony.end)
 		fmt.Println("Paths from start to end:")
 		for _, path := range paths {
 			fmt.Println(strings.Join(path, " -> "))
 		}
-		
-		// Remove paths with the most collisions make sure this function is called only if we have more than one path
-		// paths = removeMostCollidingPaths(paths)
-		fmt.Println("Weights:", calculateWeight(&paths))
+
 		weight := calculateWeight(&paths)
 		colony.numAnts = numAnts
-		fmt.Println("what ",paths)
-		fmt.Println("candidate paths at index",candidatePaths(&paths, &weight,numAnts))
-		
+		fmt.Println("Weights:", weight)
+
+		candidatePaths := candidatePaths(&paths, &weight, numAnts)
+		removeStartAddEnd(&candidatePaths,colony.end)
+		fmt.Println("Candidate paths:",candidatePaths)
+		for _, path := range candidatePaths {
+			fmt.Println(strings.Join(path, " -> "))
+		}
+
+		printAntMovements(candidatePaths, numAnts)
 	} else {
 		fmt.Println("Start or end room not defined.")
 	}
+}
+// Print ant movements through candidate paths
+func printAntMovements(candidatePaths [][]string, numAnts int) {
+	if len(candidatePaths) == 0 || numAnts == 0 {
+		fmt.Println("No paths or ants available.")
+		return
+	}
 
+	antsPositions := make([]int, numAnts)
+	for i := 0; i < numAnts; i++ {
+		if i < len(candidatePaths) {
+			antsPositions[i] = 0
+		}
+	}
+
+	maxPathLength := 0
+	for _, path := range candidatePaths {
+		if len(path) > maxPathLength {
+			maxPathLength = len(path)
+		}
+	}
+
+	for step := 0; step < maxPathLength; step++ {
+		var stepMovements []string
+		for ant := 0; ant < numAnts; ant++ {
+			if ant < len(candidatePaths) {
+				path := candidatePaths[ant]
+				if antsPositions[ant] < len(path) {
+					stepMovements = append(stepMovements, fmt.Sprintf("L%d-%s", ant+1, path[antsPositions[ant]]))
+					antsPositions[ant]++
+				}
+			}
+		}
+		if len(stepMovements) > 0 {
+			fmt.Println(strings.Join(stepMovements, " "))
+		}
+	}
 }
 
 func calculateWeight(paths *[][]string) []int {
@@ -360,6 +395,13 @@ func candidatePaths(paths *[][]string, weight *[]int, numAnts int) [][]string {
 		
 	}
 	return candidatePaths
+}
+func removeStartAddEnd (paths *[][]string, end string)*[][]string{
+	for i := range *paths {
+		(*paths)[i] = append((*paths)[i], end)
+		(*paths)[i] =  (*paths)[i][1:]
+	}
+	return paths
 }
 
 func vertexCollision(candidatePaths *[][]string, path []string) bool {
