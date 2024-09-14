@@ -288,18 +288,15 @@ func main() {
 		for _, path := range paths {
 			fmt.Println(strings.Join(path, " -> "))
 		}
-
+		
 		// Remove paths with the most collisions make sure this function is called only if we have more than one path
-		paths = removeMostCollidingPaths(paths)
+		// paths = removeMostCollidingPaths(paths)
 		fmt.Println("Weights:", calculateWeight(&paths))
 		weight := calculateWeight(&paths)
 		colony.numAnts = numAnts
+		fmt.Println("what ",paths)
 		fmt.Println("candidate paths at index",candidatePaths(&paths, &weight,numAnts))
-		fmt.Println("Fix the collision function",paths)
-		fmt.Println("Filtered paths with least collisions:")
-		for _, path := range paths {
-			fmt.Println(strings.Join(path, " -> "))
-		}
+		
 	} else {
 		fmt.Println("Start or end room not defined.")
 	}
@@ -316,6 +313,7 @@ func calculateWeight(paths *[][]string) []int {
 
 func smallestPath(paths *[][]string, weight *[]int, index int) (int, []string) {
 	if len(*paths) == 0 || len(*paths) < index {
+		
 		log.Fatal("No paths found")
 	}
 	candidatePath := (*paths)[index]
@@ -333,24 +331,25 @@ func smallestPath(paths *[][]string, weight *[]int, index int) (int, []string) {
 	return indexSmallest, candidatePath
 }
 func candidatePaths(paths *[][]string, weight *[]int, numAnts int) [][]string {
+	fmt.Println("More path? ",len(*paths))
 	if len(*paths) == 0 {
+		fmt.Println("Heere")
 		log.Fatal("No paths found")
 	}
 	var candidatePaths [][]string
 	var i int
 	for i = 0; i < len(*paths); i++ {
-		if i == 0 {
-			_, P := smallestPath(paths, weight, 0)
-			candidatePaths = append(candidatePaths, P)
-		} else {
-			j, p := smallestPath(paths, weight, i)
+		
+			j, p := smallestPath(paths, weight, 0)
 			
 			if len(*&candidatePaths) >=numAnts{
 				return candidatePaths
 			}
 			if vertexCollision(&candidatePaths, (*paths)[j]) {
-				fmt.Println("i: ", i, "path: ", p)
 				candidatePaths = append(candidatePaths, p)
+				*paths = append((*paths)[:j], (*paths)[j+1:]...)
+				*weight = append((*weight)[:j], (*weight)[j+1:]...)
+				i--
 			} else {
 				// Remove the path at index j from *paths
 				*paths = append((*paths)[:j], (*paths)[j+1:]...)
@@ -358,7 +357,7 @@ func candidatePaths(paths *[][]string, weight *[]int, numAnts int) [][]string {
 				// Since the slice has been modified, we need to adjust the loop variable
 				i-- // Decrement i to recheck the index of the next path
 			}
-		}
+		
 	}
 	return candidatePaths
 }
@@ -367,7 +366,6 @@ func vertexCollision(candidatePaths *[][]string, path []string) bool {
 	for _, candidatePath := range *candidatePaths {
 		for i, _ := range candidatePath {
 			if i>0&&i < len(path) && candidatePath[i] == path[i] {
-				fmt.Println(path,"\nhhh\n",*candidatePaths)
 				return false
 			}
 		}
