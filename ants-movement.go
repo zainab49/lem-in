@@ -23,7 +23,7 @@ func moveAnts(numAnts int, paths []Path) {
 	// Assign ants to paths based on the path with the lowest cost
 	for antID := 1; antID <= numAnts; antID++ {
 		pathIndex := 0
-		minCost := InPath[0] + paths[0].roomsNum
+		minCost := InPath[0] + paths[0].roomsNum // this variable will be used to track the minimum cost
 		for i := 1; i < len(paths); i++ {
 			cost := paths[i].roomsNum + InPath[i]
 			if minCost > cost {

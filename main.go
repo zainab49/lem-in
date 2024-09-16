@@ -74,9 +74,7 @@ func main() {
 	line := strings.TrimSpace(string(file))
 	fmt.Println(line)
 	fmt.Println()
-	fmt.Println(allPaths)
-	fmt.Println(filteredPaths)
+	
 
 	moveAnts(numAnts, filteredPaths)
-	fmt.Println(numAnts)
 }

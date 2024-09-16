@@ -62,14 +62,14 @@ func FindAllPaths(startRoomName, endRoomName string) []Path {
 func filteredPaths(paths []Path) []Path {
 	// Check if backtracking is required based on the number of paths
 	if backtTrackChecker(paths) {
-		var result []Path                // Initialize a slice to store unique paths
-		usedRooms := make(map[string]bool) // Map to track rooms that have been used
+		var result []Path                            // Initialize a slice to store unique paths
+		usedRooms := make(map[string]bool)           // Map to track rooms that have been used
 		backTrackPaths(paths, usedRooms, &result, 0) // Execute the backtracking function
-		return result                    // Return the unique paths identified through backtracking
+		return result                                // Return the unique paths identified through backtracking
 	}
 
-	uniquePaths := []Path{}           // Slice to hold unique paths
-	roomUsed := make(map[string]bool) // Map to track rooms that have been used
+	uniquePaths := []Path{}            // Slice to hold unique paths
+	roomUsed := make(map[string]bool)  // Map to track rooms that have been used
 	pathLength := make(map[string]int) // Map to store the length of each path
 
 	// Sort paths by length, prioritizing shorter ones
