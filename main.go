@@ -1,417 +1,82 @@
 package main
 
 import (
-	"bufio"
 	"fmt"
 	"log"
 	"os"
-	"strconv"
 	"strings"
 )
 
-// Define the data structures
+// struct to represent the rooms
 type Room struct {
 	Name string
-	X, Y int
+	X    int
+	Y    int
 }
 
-type Colony struct {
-	Rooms map[string]Room
-	start string
-	end   string
-	numAnts int
-	Links map[string][]string
+// struct to represent the farm
+type Farm struct {
+	Rooms map[string]Room     // map of rooms
+	Links map[string][]string // map of links between those rooms
 }
 
-// Read the colony from the file (this function will be used to test if there a room in certain coordinates,
-//
-//	if so the input will be considered invalid)
-func checkCoordinates(colony *Colony) {
-	for room, links := range colony.Links {
-		fmt.Printf("%s: %v\n", room, links)
+// struct to represent the path
+type Path struct {
+	rooms    []string
+	roomsNum int
+}
+
+// variable declaration
+var (
+	numAnts      int
+	startRoom    Room
+	endRoom      Room
+	startCounter int
+	endCounter   int
+	farm         Farm
+	coords       = make(map[[2]int]bool) //coordinates
+)
+
+func main() {
+	if len(os.Args) != 2 {
+		fmt.Println("Usage: go run main.go <input_file>")
+		return
 	}
-	fmt.Println("Colory:\n", colony)
-}
-
-// read the file and return the lines
-func readFile(filename string) []string {
-	file, err := os.Open(filename)
+	inputFile := os.Args[1]
+	file, err := os.ReadFile(inputFile)
 	if err != nil {
-		log.Fatal("Error opening file: %v", err)
+		log.Fatal(err)
 	}
-	//closes the file after finishing the reading
-	defer file.Close()
-	var lines []string
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
-		if line != "" {
-			lines = append(lines, line)
-		}
 
-		if err := scanner.Err(); err != nil {
-			log.Fatal("Error reading file: %v", err)
-		}
-	}
-	return lines
-}
-
-// create Rooms
-func createRoom(colony *Colony, room string) (*Colony, error) {
-	// Room
-	parts := strings.Split(room, " ")
-	if len(parts) != 3 {
-		return nil, fmt.Errorf("invalid room format: %s", room)
-	}
-	name, xStr, yStr := parts[0], parts[1], parts[2]
-
-	xCoord, err := strconv.Atoi(parts[1])
-	if err != nil {
-		return nil, fmt.Errorf("invalid x coordinate: %s", xStr)
-	}
-	yCoord, err := strconv.Atoi(parts[2])
-	if err != nil {
-		return nil, fmt.Errorf("invalid y coordinate: %s", yStr)
-	}
-	colony.Rooms[name] = Room{Name: name, X: xCoord, Y: yCoord}
-	return colony, nil
-}
-
-// Create a tunnel
-func ceateTunnel(colony *Colony, line string) (*Colony, error) {
-	// It's a link
-	parts := strings.Split(line, "-")
-	if len(parts) != 2 {
-		return nil, fmt.Errorf("invalid tunnel format: %s", line)
-	}
-	// connecting the links to the rooms
-	room1, room2 := parts[0], parts[1]
-	// Check if the rooms exist
-	_, existsRoom1 := colony.Rooms[room1]
-	_, existsRoom2 := colony.Rooms[room2]
-
-	if !existsRoom1 || !existsRoom2 {
-		return nil, fmt.Errorf("Linking to unknown rooms: %s", line)
-	}
-	// Check if the links already exist
-	if _, exists := colony.Links[room1]; !exists {
-		colony.Links[room1] = []string{}
-	}
-	// Check if the links already exist
-	if _, exists := colony.Links[room2]; !exists {
-		colony.Links[room2] = []string{}
-	}
-	// connecting the links to the rooms
-	colony.Links[room1] = append(colony.Links[room1], room2)
-	//If line is commited we will be working on directional graph
-	colony.Links[room2] = append(colony.Links[room2], room1)
-	return colony, nil
-}
-
-// readColony reads the colony from the given file
-func readColony(fileContent []string) (Colony, int, error) {
-	colony := Colony{
+	// Initializes the farm variable with empty maps for Rooms and Links
+	farm = Farm{
 		Rooms: make(map[string]Room),
 		Links: make(map[string][]string),
 	}
 
-	var numAnts int
-	firstLine := true
-
-	for index, line := range fileContent {
-		if firstLine {
-			var err error
-			// Handle the number of ants
-			numAnts, err = strconv.Atoi(line)
-			if err != nil {
-				return Colony{}, 0, fmt.Errorf("invalid number of ants: %v", err)
-			}
-
-			firstLine = false
-			continue
-		} else if strings.HasPrefix(line, "#") {
-			// Ignore comments
-			if strings.HasPrefix(line, "##start") {
-				if index != len(fileContent)-1 {
-					colony.start = strings.Split(fileContent[index+1], " ")[0]
-				} else {
-					log.Fatal("Error Wrong file format")
-				}
-			} else if strings.HasPrefix(line, "##end") {
-				if index != len(fileContent)-1 {
-					colony.end = strings.Split(fileContent[index+1], " ")[0]
-				} else {
-					log.Fatal("Error Wrong file format")
-				}
-			} else {
-				continue
-			}
-
-		} else if strings.Contains(line, "-") {
-			_, err := ceateTunnel(&colony, line)
-			if err != nil {
-				return Colony{}, 0, err
-			}
-		} else {
-			// Room
-
-			createRoom(&colony, line)
-		}
-	}
-
-	return colony, numAnts, nil
-}
-
-// Function to find all paths from start to end
-func findAllPaths(colony Colony, start, end string) [][]string {
-	fmt.Println("start: ", start, " end: ", end)
-	var allPaths [][]string
-	visited := make(map[string]bool)
-	var path []string
-
-	var dfs func(current string)
-	dfs = func(current string) {
-		if current == end {
-			// Found a path to end
-			// Make a copy of the path and add it to allPaths
-			pathCopy := make([]string, len(path))
-			copy(pathCopy, path)
-			allPaths = append(allPaths, pathCopy)
-			return
-		}
-
-		// Mark the current node as visited
-		visited[current] = true
-		path = append(path, current)
-
-		// Explore neighbors
-		for _, neighbor := range colony.Links[current] {
-			if !visited[neighbor] {
-				dfs(neighbor)
-			}
-		}
-
-		// Backtrack: unmark the current node and remove it from the path
-		visited[current] = false
-		path = path[:len(path)-1]
-	}
-
-	// Start DFS from the start node
-	dfs(start)
-
-	return allPaths
-}
-
-// Count node appearances in paths
-func countNodeCollisions(paths [][]string) map[string]int {
-	nodeCollisionCount := make(map[string]int)
-
-	for _, path := range paths {
-		for _, node := range path {
-			nodeCollisionCount[node]++
-		}
-	}
-
-	return nodeCollisionCount
-}
-
-// Calculate the number of collisions a path has
-func pathCollisionCount(path []string, nodeCollisionCount map[string]int) int {
-	collisionCount := 0
-	for _, node := range path {
-		if nodeCollisionCount[node] > 1 {
-			collisionCount++
-		}
-	}
-	return collisionCount
-}
-
-// Remove paths with the most collisions
-func removeMostCollidingPaths(paths [][]string) [][]string {
-	nodeCollisionCount := countNodeCollisions(paths)
-	pathCollisionCounts := make([]int, len(paths))
-
-	for i, path := range paths {
-		pathCollisionCounts[i] = pathCollisionCount(path, nodeCollisionCount)
-	}
-
-	// Find maximum collision count
-	maxCollisions := -1
-	for _, count := range pathCollisionCounts {
-		if count > maxCollisions {
-			maxCollisions = count
-		}
-	}
-
-	// Remove paths with the maximum collision count
-	var filteredPaths [][]string
-	for i, path := range paths {
-		if pathCollisionCounts[i] < maxCollisions {
-			filteredPaths = append(filteredPaths, path)
-		}
-	}
-
-	return filteredPaths
-}
-func main() {
-	if len(os.Args) < 2 {
-		fmt.Println("Usage: go run . <filename>")
+	lines := strings.Split(string(file), "\n") // storing the content of the input file in an array line by line 
+	if err := readInputFile(lines); err != nil {
+		log.Fatal(err)
 		return
 	}
-	filename := os.Args[1]
-	colony, numAnts, err := readColony(readFile(filename))
-	if err != nil {
-		fmt.Println("ERROR:", err)
+	if err := validateInput(); err != nil {
+		fmt.Println("Error:", err)
 		return
 	}
-
-	fmt.Println(numAnts)
-
-	fmt.Println("Rooms:")
-	for name, room := range colony.Rooms {
-		fmt.Printf("%s: (%d, %d)\n", name, room.X, room.Y)
-	}
-
-	fmt.Println("Links:")
-	for room, links := range colony.Links {
-		fmt.Printf("%s: %v\n", room, links)
-	}
-
-	if colony.start != "" && colony.end != "" {
-		paths := findAllPaths(colony, colony.start, colony.end)
-		fmt.Println("Paths from start to end:")
-		for _, path := range paths {
-			fmt.Println(strings.Join(path, " -> "))
-		}
-
-		weight := calculateWeight(&paths)
-		colony.numAnts = numAnts
-		fmt.Println("Weights:", weight)
-
-		candidatePaths := candidatePaths(&paths, &weight, numAnts)
-		removeStartAddEnd(&candidatePaths,colony.end)
-		fmt.Println("Candidate paths:",candidatePaths)
-		for _, path := range candidatePaths {
-			fmt.Println(strings.Join(path, " -> "))
-		}
-
-		printAntMovements(candidatePaths, numAnts)
-	} else {
-		fmt.Println("Start or end room not defined.")
-	}
-}
-// Print ant movements through candidate paths
-func printAntMovements(candidatePaths [][]string, numAnts int) {
-	if len(candidatePaths) == 0 || numAnts == 0 {
-		fmt.Println("No paths or ants available.")
+	allPaths := FindAllPaths(startRoom.Name, endRoom.Name)
+	if len(allPaths) == 0 {
+		fmt.Println("Error: No valid paths found")
 		return
 	}
-
-	antsPositions := make([]int, numAnts)
-	for i := 0; i < numAnts; i++ {
-		if i < len(candidatePaths) {
-			antsPositions[i] = 0
-		}
-	}
-
-	maxPathLength := 0
-	for _, path := range candidatePaths {
-		if len(path) > maxPathLength {
-			maxPathLength = len(path)
-		}
-	}
-
-	for step := 0; step < maxPathLength; step++ {
-		var stepMovements []string
-		for ant := 0; ant < numAnts; ant++ {
-			if ant < len(candidatePaths) {
-				path := candidatePaths[ant]
-				if antsPositions[ant] < len(path) {
-					stepMovements = append(stepMovements, fmt.Sprintf("L%d-%s", ant+1, path[antsPositions[ant]]))
-					antsPositions[ant]++
-				}
-			}
-		}
-		if len(stepMovements) > 0 {
-			fmt.Println(strings.Join(stepMovements, " "))
-		}
-	}
-}
-
-func calculateWeight(paths *[][]string) []int {
-	weights := make([]int, len(*paths))
-	for i, path := range *paths {
-		weights[i] = len(path)
-	}
-	return weights
-}
-
-func smallestPath(paths *[][]string, weight *[]int, index int) (int, []string) {
-	if len(*paths) == 0 || len(*paths) < index {
-		
-		log.Fatal("No paths found")
-	}
-	candidatePath := (*paths)[index]
 	
-	indexSmallest := index
-	for i := index; i < len(*paths); i++ {
-		for j := i + 1; j < len(*weight); j++ {
-			if len(candidatePath) > (*weight)[j] {
-				candidatePath = (*paths)[j]
-				indexSmallest = j
-			}
-		}
 
-	}
-	return indexSmallest, candidatePath
-}
-func candidatePaths(paths *[][]string, weight *[]int, numAnts int) [][]string {
-	fmt.Println("More path? ",len(*paths))
-	if len(*paths) == 0 {
-		fmt.Println("Heere")
-		log.Fatal("No paths found")
-	}
-	var candidatePaths [][]string
-	var i int
-	for i = 0; i < len(*paths); i++ {
-		
-			j, p := smallestPath(paths, weight, 0)
-			
-			if len(*&candidatePaths) >=numAnts{
-				return candidatePaths
-			}
-			if vertexCollision(&candidatePaths, (*paths)[j]) {
-				candidatePaths = append(candidatePaths, p)
-				*paths = append((*paths)[:j], (*paths)[j+1:]...)
-				*weight = append((*weight)[:j], (*weight)[j+1:]...)
-				i--
-			} else {
-				// Remove the path at index j from *paths
-				*paths = append((*paths)[:j], (*paths)[j+1:]...)
-				*weight = append((*weight)[:j], (*weight)[j+1:]...)
-				// Since the slice has been modified, we need to adjust the loop variable
-				i-- // Decrement i to recheck the index of the next path
-			}
-		
-	}
-	return candidatePaths
-}
-func removeStartAddEnd (paths *[][]string, end string)*[][]string{
-	for i := range *paths {
-		(*paths)[i] = append((*paths)[i], end)
-		(*paths)[i] =  (*paths)[i][1:]
-	}
-	return paths
-}
+	filteredPaths := filteredPaths(allPaths)
+	line := strings.TrimSpace(string(file))
+	fmt.Println(line)
+	fmt.Println()
+	fmt.Println(allPaths)
+	fmt.Println(filteredPaths)
 
-func vertexCollision(candidatePaths *[][]string, path []string) bool {
-	for _, candidatePath := range *candidatePaths {
-		for i, _ := range candidatePath {
-			if i>0&&i < len(path) && candidatePath[i] == path[i] {
-				return false
-			}
-		}
-	}
-	return true
+	moveAnts(numAnts, filteredPaths)
+	fmt.Println(numAnts)
 }
-
